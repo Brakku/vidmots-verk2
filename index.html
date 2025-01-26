@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Touch Test</title>
+    <style>
+        html, body {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        #touchArea {
+            width: 100%;
+            height: 100%;
+            background-color: lightblue;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+        }
+        #box {
+            width: 50px;
+            height: 50px;
+            background-color: red;
+            position: absolute;
+            transition: transform 0.1s ease-out, left 0.1s ease-out, top 0.1s ease-out;
+            transform-origin: center;
+        }
+        #hollowCircle {
+            position: absolute;
+            border: 2px solid black;
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+        }
+        #toggleButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid black;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="touchArea" style="touch-action: none; user-select: none;">touch me</div>
+    <svg id="box" width="50" height="50">
+        <circle cx="25" cy="25" r="25" fill="red" />
+    </svg>
+    <div id="hollowCircle"></div>
+    <button id="toggleButton">Enable Box</button>
+    <script>
+        const touchArea = document.getElementById('touchArea');
+        const element = document.getElementById('box');
+        const hollowCircle = document.getElementById('hollowCircle');
+        const toggleButton = document.getElementById('toggleButton');
+        let initialTouch = null;
+        let animationFrameId = null;
+        let longPressTimeout = null;
+        let boxEnabled = false;
+
+        
+        //Update the position and rotation of the box.
+
+        function updateBoxPosition(multi, touches) {
+            let centerX = 0;
+            let centerY = 0;
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            // Calculate the center and bounding box of the touches
+            Array.from(touches).forEach(touch => {
+                centerX += touch.clientX;
+                centerY += touch.clientY;
+                if (touch.clientX < minX) minX = touch.clientX;
+                if (touch.clientY < minY) minY = touch.clientY;
+                if (touch.clientX > maxX) maxX = touch.clientX;
+                if (touch.clientY > maxY) maxY = touch.clientY;
+            });
+            centerX /= touches.length;
+            centerY /= touches.length;
+
+            // Update the hollow circle to surround the touches
+            const radius = Math.max(maxX - minX, maxY - minY) / 2;
+            hollowCircle.style.width = `${radius * 2}px`;
+            hollowCircle.style.height = `${radius * 2}px`;
+            hollowCircle.style.left = `${centerX - radius}px`;
+            hollowCircle.style.top = `${centerY - radius}px`;
+
+            // Update the box position and rotation
+            if (multi) {
+                const touch1 = touches[0];
+                const touch2 = touches[1];
+                const deltaX = touch2.clientX - touch1.clientX;
+                const deltaY = touch2.clientY - touch1.clientY;
+                const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+                element.style.transform = `rotate(${angle}deg)`;
+            } else {
+                const touch1 = touches[0];
+                const deltaX = touch1.clientX - initialTouch.x;
+                const deltaY = touch1.clientY - initialTouch.y;
+                const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+                element.style.transform = `rotate(${angle}deg)`;
+            }
+
+            element.style.left = `${centerX-25}px`; // Set x position
+            element.style.top = `${centerY-25}px`;
+        }
+
+        // Handle touch start event
+        touchArea.addEventListener('touchstart', (event) => {
+            if (boxEnabled && event.touches.length === 1) {
+                const touch = event.touches[0];
+                initialTouch = { x: touch.clientX, y: touch.clientY };
+                element.style.left = `${touch.clientX-25}px`; // Set x position
+                element.style.top = `${touch.clientY-25}px`;
+            }
+            if (event.touches.length === 2) {
+                longPressTimeout = setTimeout(() => {
+                    window.location.href = window.location.origin + '/site2';
+                }, 500);
+            }
+        });
+
+        // Handle touch move event
+        touchArea.addEventListener('touchmove', (event) => {
+            if (boxEnabled) {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+                animationFrameId = requestAnimationFrame(() => {
+                    if (event.touches.length === 1) {
+                        updateBoxPosition(false, event.touches);
+                    } else if (event.touches.length > 1) {
+                        updateBoxPosition(true, event.touches);
+                        hollowCircle.style.display = 'block';
+                    }
+                });
+                clearTimeout(longPressTimeout);
+                event.preventDefault(); // Prevent default zooming behavior
+            }
+        }, { passive: false });
+
+        // Handle touch end event
+        touchArea.addEventListener('touchend', (event) => {
+            if (event.touches.length === 0) {
+                initialTouch = null;
+                hollowCircle.style.display = 'none';
+            }
+            clearTimeout(longPressTimeout);
+        });
+
+        // Handle toggle button click event
+        toggleButton.addEventListener('click', () => {
+            boxEnabled = !boxEnabled;
+            element.style.display = boxEnabled ? 'block' : 'none';
+            toggleButton.textContent = boxEnabled ? 'Disable Box' : 'Enable Box';
+        });
+    </script>
+</body>
+</html>
